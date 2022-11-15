@@ -1,0 +1,7 @@
+name = "pthreads"
+uuid = "67e7e89d-5a76-441b-8d18-ff2e035d61a7"
+authors = ["Tim Besard <tim.besard@gmail.com>"]
+version = "0.1.0"
+
+[compat]
+julia = "1.9"
