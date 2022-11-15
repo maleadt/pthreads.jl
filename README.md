@@ -50,3 +50,8 @@ julia> # wait for the thread in order to detect any exception
        wait(thread)
 ERROR: InterruptException
 ```
+
+Note that the ability to run foreign threads is a relatively recent addition to Julia,
+and there may be bugs. Specifically, it is very likely that thread removal (either by
+cancelling threads, or by threads just finishing) can lead to corrupt state in the Julia
+scheduler, so it's recommended to be conservative with such operations.
