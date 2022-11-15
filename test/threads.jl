@@ -43,3 +43,22 @@ end
     @test isempty(c)
     @test_throws InterruptException wait(thread)
 end
+
+@testset "bug: pthread_exit(C_NULL) causes segfault on macOS" begin
+    wait(pthread() do
+        return
+    end)
+    GC.gc(true)
+
+    # another trigger sequence
+    let thread = pthread() do
+            sleep(1)
+        end
+        cancel(thread)
+        @test_throws InterruptException wait(thread)
+    end
+    wait(pthread() do
+        return
+    end)
+    GC.gc(true)
+end
