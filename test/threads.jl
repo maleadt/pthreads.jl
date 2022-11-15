@@ -30,19 +30,6 @@ end
     @test_throws ErrorException wait(thread)
 end
 
-@testset "kill" begin
-    c = Channel()
-    thread = pthread() do
-        sleep(0.1)
-        put!(c, 42)
-    end
-    @test isempty(c)
-    kill(thread)
-    sleep(0.2)
-    @test_broken isempty(c)     # Julia seems to ignore the signal...
-    take!(c)                    # ... so we also need the empty the channel
-end
-
 if !Sys.isapple()
     # on Darwin, cancellation seems asynchronous, and gets delivered on specific syscalls.
     # this results in the thread getting killed when we start compiling the `put!`...

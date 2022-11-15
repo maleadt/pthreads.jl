@@ -115,18 +115,6 @@ function Base.detach(thread::pthread)
 end
 
 """
-    kill(thread::pthread, [signum::Integer=SIGINT])
-
-Send a signal to the thread. The default signal is `SIGINT`.
-"""
-function Base.kill(thread::pthread, signum=Base.SIGINT)
-    status = ccall(:pthread_kill, Cint, (pthread_t, Cint), thread, signum)
-    status == 0 || pthread_error("pthread_kill", status)
-    # XXX: this doesn't seem to work; Julia seems to ignore the signal
-    return
-end
-
-"""
     cancel(thread::pthread)
 
 Forcibly cancel a thread.
