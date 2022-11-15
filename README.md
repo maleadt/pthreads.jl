@@ -12,9 +12,11 @@ julia> using pthreads
 
 julia> thread = pthread() do
            println("Hello, world!")
+           return 42
        end;
 Hello, world!
 
-julia> # wait for the thread to clean-up its resources
+julia> # wait for the thread in order to access its return value
        wait(thread)
+42
 ```
