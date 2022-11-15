@@ -52,7 +52,7 @@ function pthread(f, args...)
     thread
 end
 
-const PTHREAD_CANCEL = Ptr{Cvoid}(-1%UInt64)
+const PTHREAD_CANCEL = Ptr{Cvoid}(-1%UInt)
 
 """
     wait(thread::pthread)
