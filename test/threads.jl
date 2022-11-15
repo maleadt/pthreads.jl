@@ -46,12 +46,12 @@ end
 @testset "cancel" begin
     c = Channel()
     thread = pthread() do
-        sleep(0.5)
+        sleep(3)
         put!(c, 42)
     end
     @test isempty(c)
-    sleep(0.2)  # give the thread a chance to finish compiling
+    sleep(1)  # give the thread a chance to finish compiling
     pthreads.cancel(thread)
-    sleep(0.3)
+    sleep(2)
     @test isempty(c)
 end
