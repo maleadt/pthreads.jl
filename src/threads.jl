@@ -152,12 +152,14 @@ Wait for the thread to finish and return the value returned by the thread, or th
 exception thrown by the thread.
 """
 function Base.wait(thread::pthread)
-    # can't call pthread_join directly, because that may block the main thread
-    # and cause a deadlock when other threads are waiting for the event loop.
     ret = Ref{Ptr{Cvoid}}(C_NULL)
-    status = @threadcall(:pthread_join, Cint,
-                         (pthread_t, Ptr{Ptr{Nothing}}),
-                         thread, ret)
+    ccall(:jl_enter_threaded_region, Cvoid, ())
+    state = ccall(:jl_gc_safe_enter, Int8, ())
+    status = ccall(:pthread_join, Cint,
+                   (pthread_t, Ptr{Ptr{Nothing}}),
+                   thread, ret)
+    state = ccall(:jl_gc_safe_leave, Cvoid, (Int8,), state)
+    ccall(:jl_exit_threaded_region, Cvoid, ())
     status == 0 || pthread_error("pthread_join", status)
 
     if ret[] == PTHREAD_CANCELED
