@@ -1,7 +1,22 @@
 export pthread
 
 # TODO: update for other platforms
-const pthread_t = Culong
+struct pthread_t
+    val::Culong
+end
+
+Base.:(==)(a::pthread_t, b::pthread_t) =
+    ccall(:pthread_equal, Cint, (pthread_t, pthread_t), a, b) != 0
+
+"""
+    pthreads.threadid()
+
+Get the thread id of the current thread. This is an opaque identifier, and can only be
+compared against other pthread identifiers.
+"""
+function threadid()
+    ccall(:pthread_self, pthread_t, ())
+end
 
 """
     pthread(f, args...)
@@ -47,7 +62,7 @@ function pthread(f, args...)
     if !isassigned(pthread_dispatch_cb)
         pthread_dispatch_cb[] = @cfunction(pthread_dispatch, Cvoid, (Ptr{pthread},))
     end
-    thread = pthread(0, f, Any[args...])
+    thread = pthread(pthread_t(0), f, Any[args...])
     tid = Ref{pthread_t}()
     status = ccall(:pthread_create, Cint,
                    (Ptr{pthread_t}, Ptr{Nothing}, Ptr{Nothing}, Ref{pthread}),
