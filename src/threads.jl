@@ -1,5 +1,6 @@
 export pthread
 
+# TODO: update for other platforms
 const pthread_t = Culong
 
 """
