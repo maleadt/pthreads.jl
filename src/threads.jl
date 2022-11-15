@@ -72,6 +72,12 @@ function pthread(f, args...)
     thread
 end
 
+if Sys.isapple()
+    const PTHREAD_CANCELED = Ptr{Cvoid}(1)
+elseif Sys.islinux()
+    const PTHREAD_CANCELED = Ptr{Cvoid}(-1)
+end
+
 """
     wait(thread::pthread)
 
@@ -87,10 +93,7 @@ function Base.wait(thread::pthread)
                          thread, ret)
     status == 0 || pthread_error("pthread_join", status)
 
-    if ret[] != C_NULL
-        # on Linux PTHREAD_CANCELED=-1, on macOS PTHREAD_CANCELED=1;
-        # but since we don't ever return through pthread_exit
-        # just assume that a nonzero value indicates a canceled thread.
+    if ret[] == PTHREAD_CANCELED
         throw(InterruptException())
     elseif isdefined(thread, :err)
         throw(thread.err)   # TODO: throw with backtrace (creating an exception stack)
