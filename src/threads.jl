@@ -1,4 +1,4 @@
-export pthread
+export pthread, cancel
 
 # TODO: update for other platforms
 struct pthread_t
@@ -42,11 +42,58 @@ end
 
 Base.convert(::Type{pthread_t}, t::pthread) = t.tid
 
+if Sys.isapple()
+    const PTHREAD_CANCEL_ENABLE = 1
+    const PTHREAD_CANCEL_DISABLE = 0
+elseif Sys.islinux()
+    const PTHREAD_CANCEL_ENABLE = 0
+    const PTHREAD_CANCEL_DISABLE = 1
+end
+
+function pthread_setcancelstate(enable::Bool)
+    status = ccall(:pthread_setcancelstate, Cint, (Cint, Ptr{Cint}),
+                   enable ? PTHREAD_CANCEL_ENABLE : PTHREAD_CANCEL_DISABLE, C_NULL)
+    status == 0 || pthread_error("pthread_setcancelstate", status)
+    return
+end
+
+pthread_testcancel() = ccall(:pthread_testcancel, Cvoid, ())
+
 const pthread_dispatch_cb = Ref{Any}()
 function pthread_dispatch(threadptr::Ptr{pthread})
     thread = Base.unsafe_pointer_to_objref(threadptr)
+
+    # the Julia runtime does not support getting killed at any point,
+    # so disable cancellation until we're at a safe point.
+    pthread_setcancelstate(false)
+    julia_tid = Threads.threadid()
+
     try
-        thread.ret = thread.f(thread.args...)
+        # main task of execution
+        t1 = @task begin
+            thread.ret = thread.f(thread.args...)
+        end
+
+        # monitor task for cancellation
+        t2 = @task begin
+            while !istaskdone(t1)
+                pthread_setcancelstate(true)
+                pthread_testcancel()    # if there's a cancellation request
+                                        # we'll get killed here
+                pthread_setcancelstate(false)
+                sleep(1)
+            end
+        end
+
+        # schedule these tasks on the current thread
+        for t in (t1, t2)
+            t.sticky = true
+            ccall(:jl_set_task_tid, Cvoid, (Any, Cint), t, julia_tid-1)
+            schedule(t)
+        end
+        wait(t1)
+        # no need to wait for the monitor thread; it'll exit by itself
+        # (this improves latency)
     catch err
         thread.err = err
         thread.bt = catch_backtrace()
@@ -117,12 +164,7 @@ end
 """
     cancel(thread::pthread)
 
-Forcibly cancel a thread.
-
-!!! warning
-
-    This function is dangerous, as it may result in a thread being canceled from an unsafe
-    point, e.g., during compilation (where locks have been taken).
+Cancel a thread. This is an asynchronous signal that will be delivered at a yield point.
 """
 function cancel(thread::pthread)
     # XXX: support cancellation points
