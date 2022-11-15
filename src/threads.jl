@@ -45,15 +45,26 @@ Base.convert(::Type{pthread_t}, t::pthread) = t.tid
 if Sys.isapple()
     const PTHREAD_CANCEL_ENABLE = 1
     const PTHREAD_CANCEL_DISABLE = 0
+    const PTHREAD_CANCEL_DEFERRED = 2
+    const PTHREAD_CANCEL_ASYNCHRONOUS = 0
 elseif Sys.islinux()
     const PTHREAD_CANCEL_ENABLE = 0
     const PTHREAD_CANCEL_DISABLE = 1
+    const PTHREAD_CANCEL_DEFERRED = 0
+    const PTHREAD_CANCEL_ASYNCHRONOUS = 1
 end
 
 function pthread_setcancelstate(enable::Bool)
     status = ccall(:pthread_setcancelstate, Cint, (Cint, Ptr{Cint}),
                    enable ? PTHREAD_CANCEL_ENABLE : PTHREAD_CANCEL_DISABLE, C_NULL)
     status == 0 || pthread_error("pthread_setcancelstate", status)
+    return
+end
+
+function pthread_setcanceltype(typ)
+    status = ccall(:pthread_setcanceltype, Cint, (Cint, Ptr{Cint}),
+                   typ, C_NULL)
+    status == 0 || pthread_error("pthread_setcanceltype", status)
     return
 end
 
@@ -67,6 +78,8 @@ function pthread_dispatch(threadptr::Ptr{pthread})
     # so disable cancellation until we're at a safe point.
     pthread_setcancelstate(false)
     julia_tid = Threads.threadid()
+
+    pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED)
 
     try
         # main task of execution
