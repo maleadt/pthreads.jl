@@ -97,11 +97,8 @@ function pthread_dispatch(threadptr::Ptr{pthread})
     catch err
         thread.err = err
         thread.bt = catch_backtrace()
-    finally
-        # normally we can rely on pthreads to call pthread_exit on return,
-        # but on macOS that sets a non-null return code, so do it manually.
-        ccall(:pthread_exit, Nothing, (Ptr{Nothing},), C_NULL)
     end
+    # pthread_exit will be called implicitly
     return
 end
 
