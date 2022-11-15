@@ -35,6 +35,10 @@ function pthread_dispatch(threadptr::Ptr{pthread})
     catch err
         thread.err = err
         thread.bt = catch_backtrace()
+    finally
+        # normally we can rely on pthreads to call pthread_exit on return,
+        # but on macOS that sets a non-null return code, so do it manually.
+        ccall(:pthread_exit, Nothing, (Ptr{Nothing},), C_NULL)
     end
     return
 end
@@ -53,8 +57,6 @@ function pthread(f, args...)
     thread
 end
 
-const PTHREAD_CANCEL = Ptr{Cvoid}(-1%UInt)
-
 """
     wait(thread::pthread)
 
@@ -64,13 +66,16 @@ exception thrown by the thread.
 function Base.wait(thread::pthread)
     # can't call pthread_join directly, because that may block the main thread
     # and cause a deadlock when other threads are waiting for the event loop.
-    ret = Ref{Ptr{Cvoid}}()
+    ret = Ref{Ptr{Cvoid}}(C_NULL)
     status = @threadcall(:pthread_join, Cint,
                          (pthread_t, Ptr{Ptr{Nothing}}),
                          thread, ret)
     status == 0 || pthread_error("pthread_join", status)
 
-    if ret[] == PTHREAD_CANCEL
+    if ret[] != C_NULL
+        # on Linux PTHREAD_CANCELED=-1, on macOS PTHREAD_CANCELED=1;
+        # but since we don't ever return through pthread_exit
+        # just assume that a nonzero value indicates a canceled thread.
         throw(InterruptException())
     elseif isdefined(thread, :err)
         throw(thread.err)   # TODO: throw with backtrace (creating an exception stack)

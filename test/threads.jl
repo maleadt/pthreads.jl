@@ -43,15 +43,20 @@ end
     take!(c)                    # ... so we also need the empty the channel
 end
 
-@testset "cancel" begin
-    c = Channel()
-    thread = pthread() do
-        sleep(3)
-        put!(c, 42)
+if !Sys.isapple()
+    # on Darwin, cancellation seems asynchronous, and gets delivered on specific syscalls.
+    # this results in the thread getting killed when we start compiling the `put!`...
+    @testset "cancel" begin
+        c = Channel()
+        thread = pthread() do
+            sleep(3)
+            put!(c, 42)
+        end
+        @test isempty(c)
+        sleep(1)  # give the thread a chance to finish compiling
+        pthreads.cancel(thread)
+        sleep(2)
+        @test isempty(c)
+        @test_throws InterruptException wait(thread)
     end
-    @test isempty(c)
-    sleep(1)  # give the thread a chance to finish compiling
-    pthreads.cancel(thread)
-    sleep(2)
-    @test isempty(c)
 end
