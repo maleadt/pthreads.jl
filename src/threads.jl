@@ -90,10 +90,18 @@ function pthread_dispatch(threadptr::Ptr{pthread})
         # monitor task for cancellation
         t2 = @task begin
             while !istaskdone(t1)
+                ccall(:jl_wakeup_thread, Cvoid, (Int16,), 0)    # JuliaLang/julia#47201
+
+                # HACK: avoid GC during cancellation. I'm not sure how it happens, but on
+                #       macOS the GC has been observed to run after a thread got cancelled.
+                GC.enable(false)
+
+                # if there's a cancellation request, we'll die here
                 pthread_setcancelstate(true)
-                pthread_testcancel()    # if there's a cancellation request
-                                        # we'll get killed here
+                pthread_testcancel()
                 pthread_setcancelstate(false)
+
+                GC.enable(true)
                 sleep(1)
             end
         end
@@ -111,6 +119,8 @@ function pthread_dispatch(threadptr::Ptr{pthread})
         thread.err = err
         thread.bt = catch_backtrace()
     end
+
+    ccall(:jl_wakeup_thread, Cvoid, (Int16,), 0)    # JuliaLang/julia#47201
     # pthread_exit will be called implicitly
     return
 end
