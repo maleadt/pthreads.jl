@@ -6,7 +6,7 @@ struct pthread_t
 end
 
 Base.:(==)(a::pthread_t, b::pthread_t) =
-    ccall(:pthread_equal, Cint, (pthread_t, pthread_t), a, b) != 0
+    ccall((:pthread_equal, libpthread), Cint, (pthread_t, pthread_t), a, b) != 0
 
 """
     pthreads.threadid()
@@ -15,7 +15,7 @@ Get the thread id of the current thread. This is an opaque identifier, and can o
 compared against other pthread identifiers.
 """
 function threadid()
-    ccall(:pthread_self, pthread_t, ())
+    ccall((:pthread_self, libpthread), pthread_t, ())
 end
 
 """
@@ -55,20 +55,20 @@ elseif Sys.islinux()
 end
 
 function pthread_setcancelstate(enable::Bool)
-    status = ccall(:pthread_setcancelstate, Cint, (Cint, Ptr{Cint}),
+    status = ccall((:pthread_setcancelstate, libpthread), Cint, (Cint, Ptr{Cint}),
                    enable ? PTHREAD_CANCEL_ENABLE : PTHREAD_CANCEL_DISABLE, C_NULL)
     status == 0 || pthread_error("pthread_setcancelstate", status)
     return
 end
 
 function pthread_setcanceltype(typ)
-    status = ccall(:pthread_setcanceltype, Cint, (Cint, Ptr{Cint}),
+    status = ccall((:pthread_setcanceltype, libpthread), Cint, (Cint, Ptr{Cint}),
                    typ, C_NULL)
     status == 0 || pthread_error("pthread_setcanceltype", status)
     return
 end
 
-pthread_testcancel() = ccall(:pthread_testcancel, Cvoid, ())
+pthread_testcancel() = ccall((:pthread_testcancel, libpthread), Cvoid, ())
 
 const pthread_dispatch_cb = Ref{Any}()
 function pthread_dispatch(threadptr::Ptr{pthread})
@@ -131,7 +131,7 @@ function pthread(f, args...)
     end
     thread = pthread(pthread_t(0), f, Any[args...])
     tid = Ref{pthread_t}()
-    status = ccall(:pthread_create, Cint,
+    status = ccall((:pthread_create, libpthread), Cint,
                    (Ptr{pthread_t}, Ptr{Nothing}, Ptr{Nothing}, Ref{pthread}),
                    tid, C_NULL, pthread_dispatch_cb[], thread)
     status == 0 || pthread_error("pthread_create", status)
@@ -155,7 +155,7 @@ function Base.wait(thread::pthread)
     ret = Ref{Ptr{Cvoid}}(C_NULL)
     ccall(:jl_enter_threaded_region, Cvoid, ())
     state = ccall(:jl_gc_safe_enter, Int8, ())
-    status = ccall(:pthread_join, Cint,
+    status = ccall((:pthread_join, libpthread), Cint,
                    (pthread_t, Ptr{Ptr{Nothing}}),
                    thread, ret)
     state = ccall(:jl_gc_safe_leave, Cvoid, (Int8,), state)
@@ -178,7 +178,7 @@ Detach the thread from the current process. The thread will continue to run, but
 not need to `wait` for the thread to ensure its resources are cleaned up.
 """
 function Base.detach(thread::pthread)
-    status = ccall(:pthread_detach, Cint, (pthread_t,), thread)
+    status = ccall((:pthread_detach, libpthread), Cint, (pthread_t,), thread)
     status == 0 || pthread_error("pthread_detach", status)
     return
 end
@@ -189,7 +189,7 @@ end
 Cancel a thread. This is an asynchronous signal that will be delivered at a yield point.
 """
 function cancel(thread::pthread)
-    status = ccall(:pthread_cancel, Cint, (pthread_t,), thread)
+    status = ccall((:pthread_cancel, libpthread), Cint, (pthread_t,), thread)
     status == 0 || pthread_error("pthread_cancel", status)
     return
 end
