@@ -189,7 +189,6 @@ end
 Cancel a thread. This is an asynchronous signal that will be delivered at a yield point.
 """
 function cancel(thread::pthread)
-    # XXX: support cancellation points
     status = ccall(:pthread_cancel, Cint, (pthread_t,), thread)
     status == 0 || pthread_error("pthread_cancel", status)
     return

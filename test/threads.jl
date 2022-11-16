@@ -49,8 +49,9 @@ end
         return
     end)
     GC.gc(true)
+end
 
-    # another trigger sequence
+@testset "bug: leaving the GC enabled across pthread_testcancel causes segfault on macOS" begin
     let thread = pthread() do
             sleep(1)
         end
